@@ -1,71 +1,553 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Darkroom — select frames</title>
-    <!-- CodeAlpha Task 1 — Image Gallery -->
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎞️</text></svg>"
-    />
+    <title>grain. — Photography Gallery</title>
+
+    <!-- Fonts: IBM Plex Mono & Manrope -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="style.css" />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                bg: "#0e0e10",
+                surface: "#16161a",
+                surfaceHover: "#1f1f24",
+                border: "#26262e",
+                accent: "#f24e1e",
+                accentHover: "#ff6233",
+                muted: "#8b8b9e",
+                text: "#ececf1",
+              },
+            },
+            fontFamily: {
+              sans: ["Manrope", "sans-serif"],
+              mono: ["IBM Plex Mono", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      body {
+        background-color: #0e0e10;
+        color: #ececf1;
+        font-family: "Manrope", sans-serif;
+        overflow-y: scroll;
+      }
+
+      .masonry-feed {
+        column-count: 1;
+        column-gap: 1.25rem;
+        width: 100%;
+      }
+
+      @media (min-width: 640px) {
+        .masonry-feed {
+          column-count: 2;
+        }
+      }
+      @media (min-width: 1024px) {
+        .masonry-feed {
+          column-count: 3;
+        }
+      }
+      @media (min-width: 1280px) {
+        .masonry-feed {
+          column-count: 4;
+        }
+      }
+      @media (min-width: 1536px) {
+        .masonry-feed {
+          column-count: 5;
+        }
+      }
+
+      .masonry-feed.is-empty {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        column-count: auto !important;
+        min-height: 50vh;
+        width: 100% !important;
+      }
+
+      .gallery-item {
+        break-inside: avoid;
+        margin-bottom: 1.25rem;
+        display: inline-block;
+        width: 100%;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0e0e10;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #26262e;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3b3b48;
+      }
+
+      .card-overlay {
+        background: linear-gradient(
+          to top,
+          rgba(14, 14, 16, 0.95) 0%,
+          rgba(14, 14, 16, 0.4) 60%,
+          rgba(14, 14, 16, 0) 100%
+        );
+        opacity: 0;
+        transition: opacity 0.25s ease-in-out;
+      }
+
+      .gallery-card:hover .card-overlay {
+        opacity: 1;
+      }
+
+      .gallery-card img {
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .gallery-card:hover img {
+        transform: scale(1.03);
+      }
+
+      @keyframes heartBeat {
+        0% {
+          transform: scale(1);
+        }
+        25% {
+          transform: scale(1.25);
+        }
+        50% {
+          transform: scale(0.95);
+        }
+        75% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      .animate-heart {
+        animation: heartBeat 0.35s ease-in-out;
+      }
+    </style>
   </head>
-  <body>
-    <header class="bar">
-      <span class="brand">the darkroom</span>
-      <small>contact sheets · autumn '25</small>
-      <span class="hint"
-        ><b>← →</b> browse &nbsp; <b>ESC</b> close &nbsp; <b>click</b> to
-        enlarge</span
+  <body
+    class="min-h-screen flex flex-col selection:bg-brand-accent selection:text-white"
+  >
+    <!-- Top Navigation Header -->
+    <header
+      class="sticky top-0 z-40 bg-brand-bg/85 backdrop-blur-md border-b border-brand-border/60 transition-colors"
+    >
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4"
       >
+        <!-- Logo -->
+        <a
+          href="#"
+          id="brandLogo"
+          class="flex flex-col items-center gap-2 group"
+        >
+          <span
+            class="font-mono text-2xl font-bold tracking-tight text-white group-hover:text-brand-accent transition-colors"
+            >grain<span class="text-brand-accent">.</span></span
+          >
+          <span
+            class="hidden md:inline-block font-mono text-xs uppercase tracking-widest text-brand-muted border-l border-brand-border pl-3 ml-1"
+            >FRAME GALLERY</span
+          >
+        </a>
+
+        <!-- Search Input -->
+        <div class="flex-1 max-w-md relative">
+          <div class="relative flex items-center">
+            <svg
+              class="w-4 h-4 absolute left-3.5 text-brand-muted pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search photographers..."
+              class="w-full bg-brand-surface border border-brand-border rounded-full pl-10 pr-10 py-2 text-sm text-brand-text placeholder-brand-muted focus:outline-none focus:border-brand-accent/80 focus:ring-1 focus:ring-brand-accent/80 transition-all font-mono"
+            />
+            <button
+              id="clearSearch"
+              class="hidden absolute right-3 text-brand-muted hover:text-white"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-3">
+          <!-- Back to Feed button -->
+          <button
+            id="backToFeedBtn"
+            class="hidden flex items-center gap-2 px-4 py-2 text-xs font-mono font-medium tracking-wider uppercase rounded-full bg-brand-surface border border-brand-border text-brand-text hover:bg-brand-surfaceHover hover:border-brand-muted transition-all active:scale-95"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span class="hidden sm:inline">Back to Feed</span>
+          </button>
+
+          <!-- Saved Toggle Button -->
+          <button
+            id="savedToggleBtn"
+            class="flex items-center gap-2 px-4 py-2 text-xs font-mono font-medium tracking-wider uppercase rounded-full bg-brand-surface border border-brand-border text-brand-text hover:border-brand-accent/50 transition-all active:scale-95"
+          >
+            <svg
+              id="savedBtnHeart"
+              class="w-4 h-4 text-brand-accent transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            <span>Saved</span>
+            <span
+              id="savedCountBadge"
+              class="bg-brand-accent/20 text-brand-accent px-2 py-0.5 rounded-full text-[11px] font-bold"
+              >0</span
+            >
+          </button>
+        </div>
+      </div>
     </header>
 
-    <section class="under">
-      <h1 id="big">
-        Frames I kept. <span class="hl">Others went in the bin.</span>
-      </h1>
-      <p class="meta">
-        showing <b id="vis">12</b> / 12 frames · film scanned, not filtered
-      </p>
-    </section>
+    <!-- Filter & Mode Bar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2 w-full">
+      <div
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-border/40 pb-4"
+      >
+        <!-- Aspect Ratio Filter Chips -->
+        <div
+          id="filterChips"
+          class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"
+        >
+          <button
+            data-aspect="all"
+            class="filter-chip active px-4 py-1.5 rounded-full text-xs font-mono transition-all bg-brand-text text-brand-bg font-semibold"
+          >
+            all
+            <span id="count-all" class="opacity-60 text-[10px] ml-1">0</span>
+          </button>
+          <button
+            data-aspect="landscape"
+            class="filter-chip px-4 py-1.5 rounded-full text-xs font-mono transition-all bg-brand-surface text-brand-muted hover:text-white border border-brand-border"
+          >
+            landscape
+            <span id="count-landscape" class="opacity-60 text-[10px] ml-1"
+              >0</span
+            >
+          </button>
+          <button
+            data-aspect="portrait"
+            class="filter-chip px-4 py-1.5 rounded-full text-xs font-mono transition-all bg-brand-surface text-brand-muted hover:text-white border border-brand-border"
+          >
+            portrait
+            <span id="count-portrait" class="opacity-60 text-[10px] ml-1"
+              >0</span
+            >
+          </button>
+          <button
+            data-aspect="square"
+            class="filter-chip px-4 py-1.5 rounded-full text-xs font-mono transition-all bg-brand-surface text-brand-muted hover:text-white border border-brand-border"
+          >
+            square
+            <span id="count-square" class="opacity-60 text-[10px] ml-1">0</span>
+          </button>
+        </div>
 
-    <div class="mq" aria-hidden="true"><div id="mqt"></div></div>
-
-    <nav class="filters" id="filters" aria-label="Filter prints"></nav>
-    <main class="wall" id="wall"></main>
-
-    <footer>
-      <span>prints — picsum placeholders (swap with your own)</span>
-      <span>hand-coded · codealpha task 1</span>
-    </footer>
-
-    <div id="cur"><span>OPEN</span></div>
-
-    <div
-      class="lb"
-      id="lb"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Enlarged print"
-    >
-      <span class="lb-count" id="lbCount"></span>
-      <button class="lb-x" id="lbX">CLOSE ×</button>
-      <figure class="lb-print" id="lbPrint">
-        <img id="lbImg" alt="" />
-        <figcaption class="cap">
-          <span id="lbNote"></span><small id="lbNo"></small>
-        </figcaption>
-      </figure>
-      <button class="arrow p" id="lbP" aria-label="Previous">←</button>
-      <button class="arrow n" id="lbN" aria-label="Next">→</button>
-      <div class="strip" id="strip"></div>
+        <!-- Feed Status Indicator -->
+        <div
+          id="feedStatusLabel"
+          class="text-xs font-mono text-brand-muted flex items-center gap-2"
+        >
+          <span class="text-brand-accent">#</span>
+          <span id="statusText">LIVE FEED</span>
+        </div>
+      </div>
     </div>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+      <!-- Masonry Photo Feed / Empty Container -->
+      <div id="galleryFeed" class="masonry-feed">
+        <!-- Dynamic photo cards or single centered empty state generated here via JS -->
+      </div>
+
+      <!-- Infinite Scroll Sentinel & Loader -->
+      <div
+        id="scrollSentinel"
+        class="py-12 flex justify-center items-center w-full"
+      >
+        <div
+          id="loadingSpinner"
+          class="flex items-center gap-3 text-brand-muted font-mono text-xs"
+        >
+          <svg
+            class="animate-spin h-5 w-5 text-brand-accent"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span>Curating fine frames...</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Fullscreen Lightbox Modal -->
+    <div
+      id="lightbox"
+      class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl hidden flex-col justify-between p-4 sm:p-8 opacity-0 transition-opacity duration-300"
+    >
+      <!-- Lightbox Header -->
+      <div
+        class="flex items-center justify-between text-white z-10 w-full max-w-6xl mx-auto"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="w-8 h-8 rounded-full bg-brand-surface border border-brand-border flex items-center justify-center font-mono text-xs font-bold text-brand-accent"
+          >
+            g.
+          </div>
+          <div>
+            <h4
+              id="lightboxAuthor"
+              class="font-medium text-sm sm:text-base leading-tight"
+            >
+              Photographer Name
+            </h4>
+            <p id="lightboxMeta" class="text-xs font-mono text-brand-muted">
+              Dimensions & Aspect
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Lightbox Save Button -->
+          <button
+            id="lightboxSaveBtn"
+            class="p-2.5 rounded-full bg-brand-surface border border-brand-border text-white hover:border-brand-accent/50 transition-all active:scale-90"
+          >
+            <svg
+              class="w-5 h-5 heart-icon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+          </button>
+
+          <!-- Direct Unsplash/Picsum Link -->
+          <a
+            id="lightboxOriginalLink"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="p-2.5 rounded-full bg-brand-surface border border-brand-border text-white hover:text-brand-accent transition-all"
+          >
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+
+          <!-- Close Button -->
+          <button
+            id="lightboxCloseBtn"
+            class="p-2.5 rounded-full bg-brand-surface border border-brand-border text-white hover:bg-brand-surfaceHover transition-all"
+          >
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Lightbox Image Center -->
+      <div
+        class="relative flex-1 flex items-center justify-center my-4 overflow-hidden"
+      >
+        <!-- Previous Button -->
+        <button
+          id="prevPhotoBtn"
+          class="absolute left-2 sm:left-6 z-20 p-3 rounded-full bg-brand-surface/80 border border-brand-border text-white hover:bg-brand-accent transition-all backdrop-blur-sm"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+        </button>
+
+        <img
+          id="lightboxImg"
+          class="max-h-full max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-300"
+          src=""
+          alt=""
+        />
+
+        <!-- Next Button -->
+        <button
+          id="nextPhotoBtn"
+          class="absolute right-2 sm:right-6 z-20 p-3 rounded-full bg-brand-surface/80 border border-brand-border text-white hover:bg-brand-accent transition-all backdrop-blur-sm"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Lightbox Footer Controls -->
+      <div
+        class="flex items-center justify-between text-xs font-mono text-brand-muted max-w-6xl mx-auto w-full"
+      >
+        <div id="lightboxIndex">FRAME 0 OF 0</div>
+        <div class="hidden sm:block">
+          Use ← → arrow keys to navigate, ESC to exit
+        </div>
+        <button
+          id="downloadBtn"
+          class="flex items-center gap-2 hover:text-white transition-colors"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+          <span>Download Photo</span>
+        </button>
+      </div>
+    </div>
+
     <script src="app.js"></script>
   </body>
 </html>
