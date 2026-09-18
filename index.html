@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Darkroom — select frames</title>
+    <!-- CodeAlpha Task 1 — Image Gallery -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎞️</text></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <span class="brand">the darkroom</span>
+      <small>contact sheets · autumn '25</small>
+      <span class="hint"
+        ><b>← →</b> browse &nbsp; <b>ESC</b> close &nbsp; <b>click</b> to
+        enlarge</span
+      >
+    </header>
+
+    <section class="under">
+      <h1 id="big">
+        Frames I kept. <span class="hl">Others went in the bin.</span>
+      </h1>
+      <p class="meta">
+        showing <b id="vis">12</b> / 12 frames · film scanned, not filtered
+      </p>
+    </section>
+
+    <div class="mq" aria-hidden="true"><div id="mqt"></div></div>
+
+    <nav class="filters" id="filters" aria-label="Filter prints"></nav>
+    <main class="wall" id="wall"></main>
+
+    <footer>
+      <span>prints — picsum placeholders (swap with your own)</span>
+      <span>hand-coded · codealpha task 1</span>
+    </footer>
+
+    <div id="cur"><span>OPEN</span></div>
+
+    <div
+      class="lb"
+      id="lb"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Enlarged print"
+    >
+      <span class="lb-count" id="lbCount"></span>
+      <button class="lb-x" id="lbX">CLOSE ×</button>
+      <figure class="lb-print" id="lbPrint">
+        <img id="lbImg" alt="" />
+        <figcaption class="cap">
+          <span id="lbNote"></span><small id="lbNo"></small>
+        </figcaption>
+      </figure>
+      <button class="arrow p" id="lbP" aria-label="Previous">←</button>
+      <button class="arrow n" id="lbN" aria-label="Next">→</button>
+      <div class="strip" id="strip"></div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
