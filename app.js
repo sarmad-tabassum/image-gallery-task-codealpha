@@ -1,7 +1,6 @@
-/* Application Core State */
 const appState = {
   photos: [],
-  likedPhotos: [], 
+  likedPhotos: [],
   viewMode: "feed",
   selectedAspect: "all",
   searchQuery: "",
@@ -12,7 +11,7 @@ const appState = {
   currentLightboxIndex: -1,
 };
 
-/* DOM References */
+// DOM Elements
 const galleryFeed = document.getElementById("galleryFeed");
 const scrollSentinel = document.getElementById("scrollSentinel");
 const loadingSpinner = document.getElementById("loadingSpinner");
@@ -22,11 +21,10 @@ const savedCountBadge = document.getElementById("savedCountBadge");
 const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearch");
 const filterChips = document.getElementById("filterChips");
-const feedStatusLabel = document.getElementById("feedStatusLabel");
 const statusText = document.getElementById("statusText");
 const brandLogo = document.getElementById("brandLogo");
 
-/* Lightbox DOM References */
+// Lightbox Elements
 const lightbox = document.getElementById("lightbox");
 const lightboxImg = document.getElementById("lightboxImg");
 const lightboxAuthor = document.getElementById("lightboxAuthor");
@@ -39,7 +37,7 @@ const prevPhotoBtn = document.getElementById("prevPhotoBtn");
 const nextPhotoBtn = document.getElementById("nextPhotoBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
-/* Helper: Determine Aspect Ratio Category */
+// Find photo orientation
 function getAspectCategory(width, height) {
   const ratio = width / height;
   if (ratio > 1.2) return "landscape";
@@ -47,15 +45,15 @@ function getAspectCategory(width, height) {
   return "square";
 }
 
-/* LocalStorage Manager */
+// LocalStorage operations
 function loadSavedPhotos() {
   try {
     const saved = localStorage.getItem("grain_saved_photos");
     if (saved) {
       appState.likedPhotos = JSON.parse(saved);
     }
-  } catch (e) {
-    console.error("Failed to load saved photos from LocalStorage", e);
+  } catch (error) {
+    console.error("Error loading saved photos:", error);
   }
   updateSavedBadge();
 }
@@ -66,37 +64,49 @@ function saveSavedPhotos() {
       "grain_saved_photos",
       JSON.stringify(appState.likedPhotos),
     );
-  } catch (e) {
-    console.error("Failed to persist saved photos to LocalStorage", e);
+  } catch (error) {
+    console.error("Error saving photos:", error);
   }
   updateSavedBadge();
 }
 
 function isPhotoSaved(id) {
-  return appState.likedPhotos.some((p) => String(p.id) === String(id));
+  return appState.likedPhotos.some((photo) => String(photo.id) === String(id));
 }
 
 function toggleSavePhoto(photo) {
   const index = appState.likedPhotos.findIndex(
-    (p) => String(p.id) === String(photo.id),
+    (item) => String(item.id) === String(photo.id),
   );
+
   if (index > -1) {
     appState.likedPhotos.splice(index, 1);
   } else {
     appState.likedPhotos.push(photo);
   }
+
   saveSavedPhotos();
   renderGallery();
   updateLightboxHeart();
 }
 
+window.toggleSavePhotoById = function (id) {
+  const photo =
+    appState.photos.find((p) => String(p.id) === String(id)) ||
+    appState.likedPhotos.find((p) => String(p.id) === String(id));
+  if (photo) {
+    toggleSavePhoto(photo);
+  }
+};
+
 function updateSavedBadge() {
   savedCountBadge.textContent = appState.likedPhotos.length;
 }
 
-/* API Fetching */
+// Fetch photos from API
 async function fetchPhotos() {
   if (appState.isLoading || !appState.hasMore) return;
+
   appState.isLoading = true;
   loadingSpinner.style.display = "flex";
 
@@ -109,11 +119,10 @@ async function fetchPhotos() {
     if (data.length === 0) {
       appState.hasMore = false;
     } else {
-      // Process photos with aspect details & web urls
-      const formatted = data.map((item) => {
+      const formattedPhotos = data.map((item) => {
         const aspect = getAspectCategory(item.width, item.height);
-        // Optimizing thumbnail height based on screen proportions
-        const thumbUrl = `https://picsum.photos/id/${item.id}/600/${Math.round(600 * (item.height / item.width))}`;
+        const thumbHeight = Math.round(600 * (item.height / item.width));
+
         return {
           id: item.id,
           author: item.author,
@@ -121,18 +130,17 @@ async function fetchPhotos() {
           height: item.height,
           url: item.url,
           download_url: item.download_url,
-          thumb_url: thumbUrl,
+          thumb_url: `https://picsum.photos/id/${item.id}/600/${thumbHeight}`,
           aspect: aspect,
         };
       });
 
-      appState.photos = [...appState.photos, ...formatted];
+      appState.photos = [...appState.photos, ...formattedPhotos];
       appState.page++;
-      updateFilterCounts();
       renderGallery();
     }
-  } catch (err) {
-    console.error("Error fetching photos:", err);
+  } catch (error) {
+    console.error("Fetch error:", error);
   } finally {
     appState.isLoading = false;
     if (!appState.hasMore) {
@@ -141,7 +149,23 @@ async function fetchPhotos() {
   }
 }
 
-/* Calculate Filter Counts */
+// Filter and search logic
+function getDisplayPhotos() {
+  let list =
+    appState.viewMode === "saved" ? appState.likedPhotos : appState.photos;
+
+  if (appState.selectedAspect !== "all") {
+    list = list.filter((photo) => photo.aspect === appState.selectedAspect);
+  }
+
+  if (appState.searchQuery.trim() !== "") {
+    const query = appState.searchQuery.toLowerCase();
+    list = list.filter((photo) => photo.author.toLowerCase().includes(query));
+  }
+
+  return list;
+}
+
 function updateFilterCounts() {
   const activeList =
     appState.viewMode === "saved" ? appState.likedPhotos : appState.photos;
@@ -158,157 +182,117 @@ function updateFilterCounts() {
   ).length;
 }
 
-/* Filter Photos for Active View */
-function getDisplayPhotos() {
-  let source =
-    appState.viewMode === "saved" ? appState.likedPhotos : appState.photos;
-
-  // Filter by aspect ratio
-  if (appState.selectedAspect !== "all") {
-    source = source.filter((p) => p.aspect === appState.selectedAspect);
-  }
-
-  // Filter by search query
-  if (appState.searchQuery.trim() !== "") {
-    const q = appState.searchQuery.toLowerCase();
-    source = source.filter((p) => p.author.toLowerCase().includes(q));
-  }
-
-  return source;
-}
-
-/* Render Gallery Items */
+// Render gallery
 function renderGallery() {
   const displayPhotos = getDisplayPhotos();
   updateFilterCounts();
 
-  // If display is empty, remove CSS multi-column so empty state spans centered full width
   if (displayPhotos.length === 0) {
     galleryFeed.classList.add("is-empty");
     renderEmptyState();
     return;
   }
 
-  // Restore masonry column layout when items are present
   galleryFeed.classList.remove("is-empty");
 
-  galleryFeed.innerHTML = displayPhotos
-    .map((photo) => {
-      const saved = isPhotoSaved(photo.id);
-      const heartFill = saved
-        ? "fill-brand-accent text-brand-accent"
-        : "fill-none text-white";
+  let cardsHtml = "";
+  for (let i = 0; i < displayPhotos.length; i++) {
+    const photo = displayPhotos[i];
+    const saved = isPhotoSaved(photo.id);
+    const heartClass = saved
+      ? "fill-brand-accent text-brand-accent"
+      : "fill-none text-white";
 
-      return `
-          <div class="gallery-item">
-            <div class="gallery-card relative group rounded-xl overflow-hidden bg-brand-surface border border-brand-border/60 shadow-lg transition-all duration-300 hover:border-brand-border cursor-pointer">
-              
-              <!-- Image -->
-              <img 
-                src="${photo.thumb_url}" 
-                alt="Photo by ${photo.author}"
-                loading="lazy"
-                class="w-full h-auto object-cover block bg-brand-surface"
-                onclick="openLightbox('${photo.id}')"
-              />
-
-              <!-- Hover Overlay -->
-              <div class="card-overlay absolute inset-0 p-4 flex flex-col justify-between pointer-events-none">
-                
-                <!-- Top Right Save Button -->
-                <div class="flex justify-between items-center w-full">
-                  <span class="text-[10px] font-mono bg-black/60 backdrop-blur-md px-2 py-1 rounded text-brand-muted uppercase border border-white/10">
-                    ${photo.aspect}
-                  </span>
-                  <button 
-                    onclick="event.stopPropagation(); toggleSavePhotoById('${photo.id}')"
-                    class="pointer-events-auto p-2.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15 hover:bg-brand-accent/90 hover:border-brand-accent transition-all active:scale-90"
-                    title="${saved ? "Remove from saved" : "Save frame"}"
-                  >
-                    <svg class="w-4 h-4 transition-transform ${heartFill}" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-                    </svg>
-                  </button>
-                </div>
-
-                <!-- Bottom Author Info -->
-                <div class="pointer-events-auto flex items-end justify-between" onclick="openLightbox('${photo.id}')">
-                  <div>
-                    <h3 class="text-sm font-semibold text-white tracking-wide leading-tight group-hover:text-brand-accent transition-colors">
-                      ${photo.author}
-                    </h3>
-                    <p class="text-[11px] font-mono text-brand-muted mt-0.5">${photo.width} × ${photo.height}px</p>
-                  </div>
-                </div>
-
+    cardsHtml += `
+      <div class="gallery-item">
+        <div class="gallery-card relative group rounded-xl overflow-hidden bg-brand-surface border border-brand-border/60 shadow-lg transition-all duration-300 hover:border-brand-border cursor-pointer">
+          <img 
+            src="${photo.thumb_url}" 
+            alt="Photo by ${photo.author}"
+            loading="lazy"
+            class="w-full h-auto object-cover block bg-brand-surface"
+            onclick="openLightbox('${photo.id}')"
+          />
+          <div class="card-overlay absolute inset-0 p-4 flex flex-col justify-between pointer-events-none">
+            <div class="flex justify-between items-center w-full">
+              <span class="text-[10px] font-mono bg-black/60 backdrop-blur-md px-2 py-1 rounded text-brand-muted uppercase border border-white/10">
+                ${photo.aspect}
+              </span>
+              <button 
+                onclick="event.stopPropagation(); toggleSavePhotoById('${photo.id}')"
+                class="pointer-events-auto p-2.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15 hover:bg-brand-accent/90 hover:border-brand-accent transition-all active:scale-90"
+                title="${saved ? "Remove from saved" : "Save frame"}"
+              >
+                <svg class="w-4 h-4 transition-transform ${heartClass}" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="pointer-events-auto flex items-end justify-between" onclick="openLightbox('${photo.id}')">
+              <div>
+                <h3 class="text-sm font-semibold text-white tracking-wide leading-tight group-hover:text-brand-accent transition-colors">
+                  ${photo.author}
+                </h3>
+                <p class="text-[11px] font-mono text-brand-muted mt-0.5">${photo.width} × ${photo.height}px</p>
               </div>
-
             </div>
           </div>
-        `;
-    })
-    .join("");
+        </div>
+      </div>
+    `;
+  }
+
+  galleryFeed.innerHTML = cardsHtml;
 }
 
-/* Helper function for inline HTML event binding */
-window.toggleSavePhotoById = function (id) {
-  const photo =
-    appState.photos.find((p) => String(p.id) === String(id)) ||
-    appState.likedPhotos.find((p) => String(p.id) === String(id));
-  if (photo) {
-    toggleSavePhoto(photo);
-  }
-};
-
-/* Render Clean Empty States */
 function renderEmptyState() {
   if (appState.viewMode === "saved") {
     galleryFeed.innerHTML = `
-          <div class="state-container max-w-md mx-auto my-12 text-center p-8 rounded-2xl bg-brand-surface border border-brand-border/80 shadow-2xl">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center text-brand-accent">
-              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-white mb-2">No saved frames yet</h3>
-            <p class="text-xs font-mono text-brand-muted leading-relaxed mb-6">
-              Hover over any photo card in the gallery feed and click the heart icon to save it here.
-            </p>
-            <button 
-              onclick="switchToFeedView()" 
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-accent text-white text-xs font-mono font-semibold hover:bg-brand-accentHover transition-all active:scale-95 shadow-lg shadow-brand-accent/20"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-              </svg>
-              <span>Explore Gallery Feed</span>
-            </button>
-          </div>
-        `;
+      <div class="state-container max-w-md mx-auto my-12 text-center p-8 rounded-2xl bg-brand-surface border border-brand-border/80 shadow-2xl">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center text-brand-accent">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">No saved frames yet</h3>
+        <p class="text-xs font-mono text-brand-muted leading-relaxed mb-6">
+          Hover over any photo card in the gallery feed and click the heart icon to save it here.
+        </p>
+        <button 
+          onclick="switchToFeedView()" 
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-accent text-white text-xs font-mono font-semibold hover:bg-brand-accentHover transition-all active:scale-95 shadow-lg shadow-brand-accent/20"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+          </svg>
+          <span>Explore Gallery Feed</span>
+        </button>
+      </div>
+    `;
   } else {
     galleryFeed.innerHTML = `
-          <div class="state-container max-w-md mx-auto my-12 text-center p-8 rounded-2xl bg-brand-surface border border-brand-border/80 shadow-2xl">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-border/40 flex items-center justify-center text-brand-muted">
-              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-              </svg>
-            </div>
-            <h3 class="text-lg font-bold text-white mb-2">No matching frames</h3>
-            <p class="text-xs font-mono text-brand-muted leading-relaxed mb-6">
-              No photographs found matching your filter or search query "${appState.searchQuery}".
-            </p>
-            <button 
-              onclick="resetFilters()" 
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-surfaceHover border border-brand-border text-white text-xs font-mono font-medium hover:border-brand-muted transition-all"
-            >
-              Reset Filters
-            </button>
-          </div>
-        `;
+      <div class="state-container max-w-md mx-auto my-12 text-center p-8 rounded-2xl bg-brand-surface border border-brand-border/80 shadow-2xl">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-border/40 flex items-center justify-center text-brand-muted">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">No matching frames</h3>
+        <p class="text-xs font-mono text-brand-muted leading-relaxed mb-6">
+          No photographs found matching your filter or search query "${appState.searchQuery}".
+        </p>
+        <button 
+          onclick="resetFilters()" 
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-surfaceHover border border-brand-border text-white text-xs font-mono font-medium hover:border-brand-muted transition-all"
+        >
+          Reset Filters
+        </button>
+      </div>
+    `;
   }
 }
 
-/* Switching Views */
+// Navigation & views
 function switchToSavedView() {
   appState.viewMode = "saved";
   savedToggleBtn.classList.add(
@@ -345,7 +329,9 @@ function resetFilters() {
   searchInput.value = "";
   clearSearchBtn.classList.add("hidden");
 
-  document.querySelectorAll(".filter-chip").forEach((btn) => {
+  const filterButtons = document.querySelectorAll(".filter-chip");
+  for (let i = 0; i < filterButtons.length; i++) {
+    const btn = filterButtons[i];
     if (btn.dataset.aspect === "all") {
       btn.classList.add("bg-brand-text", "text-brand-bg", "font-semibold");
       btn.classList.remove("bg-brand-surface", "text-brand-muted", "border");
@@ -353,20 +339,20 @@ function resetFilters() {
       btn.classList.remove("bg-brand-text", "text-brand-bg", "font-semibold");
       btn.classList.add("bg-brand-surface", "text-brand-muted", "border");
     }
-  });
+  }
 
   renderGallery();
 }
 
 window.resetFilters = resetFilters;
 
-/* Lightbox Modal Logic */
+// Lightbox modal logic
 window.openLightbox = function (id) {
   const displayPhotos = getDisplayPhotos();
-  const idx = displayPhotos.findIndex((p) => String(p.id) === String(id));
-  if (idx === -1) return;
+  const index = displayPhotos.findIndex((p) => String(p.id) === String(id));
+  if (index === -1) return;
 
-  appState.currentLightboxIndex = idx;
+  appState.currentLightboxIndex = index;
   updateLightboxContent();
 
   lightbox.classList.remove("hidden");
@@ -381,7 +367,6 @@ function updateLightboxContent() {
   const photo = displayPhotos[appState.currentLightboxIndex];
   if (!photo) return;
 
-  // High res full display url
   lightboxImg.src = photo.download_url;
   lightboxAuthor.textContent = photo.author;
   lightboxMeta.textContent = `${photo.width} × ${photo.height}px • ${photo.aspect.toUpperCase()}`;
@@ -398,6 +383,7 @@ function updateLightboxHeart() {
 
   const saved = isPhotoSaved(photo.id);
   const icon = lightboxSaveBtn.querySelector(".heart-icon");
+
   if (saved) {
     icon.setAttribute("fill", "#f24e1e");
     icon.setAttribute("stroke", "#f24e1e");
@@ -434,7 +420,6 @@ function prevLightboxPhoto() {
   updateLightboxContent();
 }
 
-/* Download Image Helper */
 async function downloadCurrentImage() {
   const displayPhotos = getDisplayPhotos();
   const photo = displayPhotos[appState.currentLightboxIndex];
@@ -444,21 +429,20 @@ async function downloadCurrentImage() {
     const response = await fetch(photo.download_url);
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = `grain-${photo.id}-${photo.author.toLowerCase().replace(/\s+/g, "-")}.jpg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `grain-${photo.id}-${photo.author.toLowerCase().replace(/\s+/g, "-")}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(blobUrl);
-  } catch (e) {
+  } catch (error) {
     window.open(photo.download_url, "_blank");
   }
 }
 
-/* Setup Event Listeners */
+// Event Listeners setup
 function initEventListeners() {
-  // Saved Mode Toggle
   savedToggleBtn.addEventListener("click", () => {
     if (appState.viewMode === "saved") {
       switchToFeedView();
@@ -468,17 +452,17 @@ function initEventListeners() {
   });
 
   backToFeedBtn.addEventListener("click", switchToFeedView);
-  brandLogo.addEventListener("click", (e) => {
-    e.preventDefault();
+
+  brandLogo.addEventListener("click", (event) => {
+    event.preventDefault();
     switchToFeedView();
     resetFilters();
   });
 
-  // Search input debouncing
   let searchTimeout = null;
-  searchInput.addEventListener("input", (e) => {
-    const val = e.target.value;
-    if (val.length > 0) {
+  searchInput.addEventListener("input", (event) => {
+    const value = event.target.value;
+    if (value.length > 0) {
       clearSearchBtn.classList.remove("hidden");
     } else {
       clearSearchBtn.classList.add("hidden");
@@ -486,7 +470,7 @@ function initEventListeners() {
 
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      appState.searchQuery = val;
+      appState.searchQuery = value;
       renderGallery();
     }, 200);
   });
@@ -498,15 +482,15 @@ function initEventListeners() {
     renderGallery();
   });
 
-  // Aspect Filter Chips
-  filterChips.addEventListener("click", (e) => {
-    const target = e.target.closest(".filter-chip");
+  filterChips.addEventListener("click", (event) => {
+    const target = event.target.closest(".filter-chip");
     if (!target) return;
 
-    const aspect = target.dataset.aspect;
-    appState.selectedAspect = aspect;
+    appState.selectedAspect = target.dataset.aspect;
 
-    document.querySelectorAll(".filter-chip").forEach((btn) => {
+    const buttons = document.querySelectorAll(".filter-chip");
+    for (let i = 0; i < buttons.length; i++) {
+      const btn = buttons[i];
       if (btn === target) {
         btn.classList.add("bg-brand-text", "text-brand-bg", "font-semibold");
         btn.classList.remove("bg-brand-surface", "text-brand-muted", "border");
@@ -514,12 +498,11 @@ function initEventListeners() {
         btn.classList.remove("bg-brand-text", "text-brand-bg", "font-semibold");
         btn.classList.add("bg-brand-surface", "text-brand-muted", "border");
       }
-    });
+    }
 
     renderGallery();
   });
 
-  // Lightbox Controls
   lightboxCloseBtn.addEventListener("click", closeLightbox);
   nextPhotoBtn.addEventListener("click", nextLightboxPhoto);
   prevPhotoBtn.addEventListener("click", prevLightboxPhoto);
@@ -533,16 +516,14 @@ function initEventListeners() {
     }
   });
 
-  // Keyboard Shortcuts for Lightbox
-  window.addEventListener("keydown", (e) => {
+  window.addEventListener("keydown", (event) => {
     if (lightbox.classList.contains("hidden")) return;
 
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowRight") nextLightboxPhoto();
-    if (e.key === "ArrowLeft") prevLightboxPhoto();
+    if (event.key === "Escape") closeLightbox();
+    if (event.key === "ArrowRight") nextLightboxPhoto();
+    if (event.key === "ArrowLeft") prevLightboxPhoto();
   });
 
-  // Infinite Scroll Intersection Observer
   const observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && appState.viewMode === "feed") {
@@ -555,7 +536,7 @@ function initEventListeners() {
   observer.observe(scrollSentinel);
 }
 
-/* Initialize App */
+// App Initialization
 window.onload = function () {
   loadSavedPhotos();
   initEventListeners();
